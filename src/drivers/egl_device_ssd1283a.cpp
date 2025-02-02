@@ -167,8 +167,7 @@ void graphics_device_ssd1283a::init(uint32_t pin_cs_, uint32_t pin_dc_, uint32_t
 #elif defined(ARDUINO_ARCH_RP2040)
   // SPI.begin(pin_sclk_, pin_miso_, pin_mosi_, pin_cs_);
   // Initialize SPI
-  // spi_init(spi_default, SPI_CLOCK_16MHZ);
-  spi_init(spi_default, 1000 * 1000);
+  spi_init(spi_default, SPI_CLOCK_16MHZ);
 
   // Set up SPI GPIO functions
   gpio_set_function(pin_sclk_, GPIO_FUNC_SPI);
@@ -460,7 +459,6 @@ void graphics_device_ssd1283a::submit_tile(uint8_t tx_, uint8_t ty_, const vec2u
     EGL_LOG("while(update_height) end \r\n");
   }
   else
-    EGL_LOG("else m_dma_transfers \r\n");
 #endif // EGL_BUILDOP_DMA_TRANSFER
   {
     EGL_LOG("endif \r\n");
@@ -619,13 +617,13 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   EGL_LOG(sizeof(*m_dma_buffer));
   EGL_LOG(" = size m_dma_buffer == 2\r\n");
   EGL_STATIC_ASSERT(sizeof(*m_dma_buffer)==2);
-  //
+  // begin spi transiton
   graphics_device_ssd1283a::begin_spi_transition();
   graphics_device_ssd1283a::set_window_address(transfer_.x, transfer_.y, transfer_.x+transfer_.width-1, transfer_.y+transfer_.height-1);
   graphics_device_ssd1283a::writecmd_cont(0x22);
 
-  m_dma_buffer_rpos=transfer_.data_offset;
-  size_t data_size=transfer_.width*transfer_.height;
+  m_dma_buffer_rpos=transfer_.data_offset;  // sets the read postion from dma buffer
+  size_t data_size=transfer_.width*transfer_.height; // amount of pixels to send
 
   // check for synchronous transfer
   if(data_size<min_dma_pixels)
@@ -644,24 +642,53 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   }
 
   // setup DMA transfer
-  const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos;
-  data_size*=sizeof(*m_dma_buffer);
+  const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos; // start address of source dma buffer
+  data_size*=sizeof(*m_dma_buffer); // number of bytes to transfer (amount pixels * byte size per pixel)
 
+  // write first pixel data manually
   update_tcr_data16();
-  graphics_device_ssd1283a::writedata16_cont(m_dma_buffer[m_dma_buffer_rpos++].v);
+  writedata16_cont(m_dma_buffer[m_dma_buffer_rpos++].v);
   data_size-=sizeof(*m_dma_buffer);
 
-  // start dma
-  EGL_LOG("dma_start_channel_mask\r\n");
-  dma_start_channel_mask(1u << m_dma_chl);
-  // dma_channel_wait_for_finish_blocking(m_dma_chl);
-  EGL_LOG("dma_start_channel_mask return\r\n");
+  static dma_channel_config dma_config = dma_channel_get_default_config(m_dma_chl);
+  dma_channel_configure(
+      m_dma_chl,                    // Channel to be configured
+      &dma_config,                  // The configuration
+      &spi_get_hw(spi_default)->dr, // The initial write address
+      (const uint16_t*)dma_buf,     // The initial read address
+      data_size,                    // Number of transfers; in this case each is 1 byte.
+      true                          // Start immediately.
+  );
+
   return true;
+  // const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos;
+  // data_size*=sizeof(*m_dma_buffer);
+  //
+  // update_tcr_data16();
+  // graphics_device_ssd1283a::writedata16_cont(m_dma_buffer[m_dma_buffer_rpos++].v);
+  // data_size-=sizeof(*m_dma_buffer);
+  //
+  // // start dma
+  // EGL_LOG("dma_start_channel_mask\r\n");
+  // dma_start_channel_mask(1u << m_dma_chl);
+  // // dma_channel_wait_for_finish_blocking(m_dma_chl);
+  // EGL_LOG("dma_start_channel_mask return\r\n");
+  // return true;
 
 
+//   // fb_format_t *data_end=data+m_tile_width*update_height;
+//   fb_format_t *data_end = m_dma_buffer + m_dma_buffer_rpos +data_size;
+//   fb_format_t *data_scan=m_dma_buffer + m_dma_buffer_rpos;
+//   while(data_scan<data_end) {
+//       graphics_device_ssd1283a::writedata16_cont((data_scan++)->v);
+//       data_scan += sizeof(int16_t);
+//   }
+//
+//   graphics_device_ssd1283a::end_spi_transition();
+//   return true;
 //
 //
-//
+// // ------------------
 //   // Get the DMA buffer pointer at the current read position
 //   const fb_format_t *dma_buf = m_dma_buffer + m_dma_buffer_rpos;
 //   data_size *= sizeof(*m_dma_buffer);
@@ -672,9 +699,9 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
 //   dma_channel_start(m_dma_buffer);
 //
 //   return true;
-//
-// // ----
-//   // check for synchronous transfer
+
+// ----
+  // check for synchronous transfer
 //   if(data_size<min_dma_pixels)
 //   {
 //     // write pixels synchronously over SPI
@@ -705,10 +732,10 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
 //   m_dma_settings.sourceBuffer((const uint16_t*)dma_buf, data_size);
 //   m_spi_kinetisk->RSER|=SPI_RSER_TFFF_DIRS|SPI_RSER_TFFF_RE;
 //   m_spi_kinetisk->MCR&=~SPI_MCR_HALT;
-// // #endif
-// //   m_dma_chl=m_dma_settings;
-// //   m_dma_chl.enable();
-// //   return true;
+// #endif
+//   m_dma_chl=m_dma_settings;
+//   m_dma_chl.enable();
+//   return true;
 }
 #endif // EGL_BUILDOP_DMA_TRANSFER
 //----------------------------------------------------------------------------
