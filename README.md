@@ -1,3 +1,7 @@
+## Fork of EmberGL for the SSD1283A display and RP2040 - Pi Pico
+
+This is a fork of [EmberGL](https://github.com/EmberGL-org/EmberGL), that adds a driver for the SSD1283A SPI module, enabling support for the 1.6-inch color TFT display. Modifications have been made to run on the RP2040 - Pi Pico.
+
 ![EmberGL logo](doc/images/embergl_logo.png)
 
 ## Overview
