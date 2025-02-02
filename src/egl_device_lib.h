@@ -14,7 +14,9 @@
 // interface
 //============================================================================
 // external
-#ifdef ARDUINO
+#if defined(ARDUINO_ARCH_RP2040)
+#include "drivers/egl_device_ssd1283a.h"
+#elif defined(ARDUINO)
 #include "drivers/egl_device_ili9341.h"
 #include "drivers/egl_device_ili9488.h"
 #else
