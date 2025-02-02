@@ -149,6 +149,10 @@ EGL_NAMESPACE_BEGIN
 #define EGL_PLATFORM_TEENSYLC
 #define EGL_PLATFORM_NUM_SPI 2
 #define EGL_PLATFORM_NUM_DMA 0
+#elif defined(ARDUINO_ARCH_RP2040)
+  // Pi Pico 2040
+#define EGL_PLATFORM_NUM_SPI 2
+#define EGL_PLATFORM_NUM_DMA 1
 // Win32
 #elif defined(EGL_PLATFORM_WIN32)
 #define EGL_PLATFORM_STR win32
@@ -362,7 +366,7 @@ typedef double udouble1_t;  // [0, 1]
 // memory management & new/delete
 //============================================================================
 EGL_NAMESPACE_END
-#if defined(ARDUINO) && !defined(CORE_TEENSY) // Arduino (except Teensy) doesn't have "new" header to define placement new operator
+#if defined(ARDUINO) && !defined(CORE_TEENSY) && !defined(ARDUINO_ARCH_RP2040) // Arduino (except Teensy) doesn't have "new" header to define placement new operator
 EGL_INLINE void *operator new(size_t, void *ptr_) throw() {return ptr_;}
 #else
 #include <new>
