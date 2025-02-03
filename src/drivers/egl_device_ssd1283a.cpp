@@ -386,7 +386,6 @@ void graphics_device_ssd1283a::submit_tile(uint8_t tx_, uint8_t ty_, const vec2u
     // add DMA transfers for the tile
     do
     {
-      EGL_LOG("get DMA transfer size \r\n");
       // get DMA transfer size
       size_t max_transfer_px=m_dma_buffer_size-m_dma_buffer_wpos;
       if(max_transfer_px<update_width*2)
@@ -469,27 +468,27 @@ void graphics_device_ssd1283a::submit_tile(uint8_t tx_, uint8_t ty_, const vec2u
       m_tile_shader->transfer_region(render_targets(), depth_target(), size_t(data-m_tile_rt0), x, y, update_width, update_height, m_tile_width);
     } else {
       EGL_LOG("else m_tile_shader \r\n");
-      graphics_device_ssd1283a::begin_spi_transition();
-      graphics_device_ssd1283a::set_window_address(x, y, x+update_width-1, y+update_height-1);
-      graphics_device_ssd1283a::writecmd_cont(0x22);
+      begin_spi_transition();
+      set_window_address(x, y, x+update_width-1, y+update_height-1);
+      writecmd_cont(0x22);
 
       fb_format_t *data_end=data+m_tile_width*update_height;
       while(1)
       {
         fb_format_t *data_scan=data, *data_scan_end=data_scan+update_width-1;
         while(data_scan<data_scan_end)
-          graphics_device_ssd1283a::writedata16_cont((data_scan++)->v);
+          writedata16_cont((data_scan++)->v);
         data+=m_tile_width;
         if(data==data_end)
         {
-          graphics_device_ssd1283a::writedata16_cont(data_scan->v);
+          writedata16_cont(data_scan->v);
           break;
         }
         else
-          graphics_device_ssd1283a::writedata16_cont(data_scan->v);
+          writedata16_cont(data_scan->v);
       }
 
-      graphics_device_ssd1283a::end_spi_transition();
+      end_spi_transition();
     }
 
 
@@ -542,7 +541,7 @@ void graphics_device_ssd1283a::dma_interrupt_impl()
   rasterizer_data_transfer &transfer=m_dma_transfers[m_dma_transfers_rpos];
   size_t data_size=transfer.width*transfer.height-1;
 
-  graphics_device_ssd1283a::end_spi_transition();
+  end_spi_transition();
   m_dma_buffer_rpos+=data_size;
 
   // move to the next DMA transfer (loop until end-of-transfers or able to start DMA transfer)
@@ -618,9 +617,9 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   EGL_LOG(" = size m_dma_buffer == 2\r\n");
   EGL_STATIC_ASSERT(sizeof(*m_dma_buffer)==2);
   // begin spi transiton
-  graphics_device_ssd1283a::begin_spi_transition();
-  graphics_device_ssd1283a::set_window_address(transfer_.x, transfer_.y, transfer_.x+transfer_.width-1, transfer_.y+transfer_.height-1);
-  graphics_device_ssd1283a::writecmd_cont(0x22);
+  begin_spi_transition();
+  set_window_address(transfer_.x, transfer_.y, transfer_.x+transfer_.width-1, transfer_.y+transfer_.height-1);
+  writecmd_cont(0x22);
 
   m_dma_buffer_rpos=transfer_.data_offset;  // sets the read postion from dma buffer
   size_t data_size=transfer_.width*transfer_.height; // amount of pixels to send
@@ -633,9 +632,9 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
     update_tcr_data16();
     const fb_format_t *buf=m_dma_buffer+m_dma_buffer_rpos, *buf_end=buf+data_size-1;
     while(buf<buf_end)
-      graphics_device_ssd1283a::writedata16_cont((buf++)->v);
-    graphics_device_ssd1283a::writedata16_last(buf->v);
-    graphics_device_ssd1283a::end_spi_transition();
+      writedata16_cont((buf++)->v);
+    writedata16_last(buf->v);
+    end_spi_transition();
     m_dma_buffer_rpos+=data_size;
 
     return false;
