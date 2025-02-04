@@ -460,7 +460,7 @@ void graphics_device_ssd1283a::submit_tile(uint8_t tx_, uint8_t ty_, const vec2u
   else
 #endif // EGL_BUILDOP_DMA_TRANSFER
   {
-    EGL_LOG("endif \r\n");
+    // EGL_LOG("endif \r\n");
 
     // synchronously SPI transfer tile update region
     if(m_tile_shader) {
@@ -490,35 +490,6 @@ void graphics_device_ssd1283a::submit_tile(uint8_t tx_, uint8_t ty_, const vec2u
 
       end_spi_transition();
     }
-
-
-    // // synchronously SPI transfer tile update region
-    // if(m_tile_shader)
-    //   m_tile_shader->transfer_region(render_targets(), depth_target(), size_t(data-m_tile_rt0), x, y, update_width, update_height, m_tile_width);
-    // else
-    // {
-    //   begin_spi_transition();
-    //   set_data_window(x, y, x+update_width-1, y+update_height-1);
-    //   writecmd_cont(ILI9341_RAMWR);
-    //   update_tcr_data16();
-    //   fb_format_t *data_end=data+m_tile_width*update_height;
-    //   while(1)
-    //   {
-    //     fb_format_t *data_scan=data, *data_scan_end=data_scan+update_width-1;
-    //     while(data_scan<data_scan_end)
-    //       writedata16_cont((data_scan++)->v);
-    //     data+=m_tile_width;
-    //     if(data==data_end)
-    //     {
-    //       writedata16_last(data_scan->v);
-    //       break;
-    //     }
-    //     else
-    //       writedata16_cont(data_scan->v);
-    //   }
-    //   end_spi_transition();
-    // }
-
   }
 }
 //----
