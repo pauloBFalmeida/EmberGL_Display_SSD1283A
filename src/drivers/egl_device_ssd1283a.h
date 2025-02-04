@@ -24,7 +24,8 @@ EGL_NAMESPACE_BEGIN
 class graphics_device_ssd1283a;
 //----------------------------------------------------------------------------
 
-#define SPI_CLOCK_16MHZ 16000000
+#define SPI_CLOCK_TRANSFER 16000000
+// #define SPI_CLOCK_TRANSFER 1000000
 #define SPI_CLOCK_DISPLAY 27000000
 
 //============================================================================
@@ -53,7 +54,7 @@ public:
   graphics_device_ssd1283a();
 	graphics_device_ssd1283a(uint32_t pin_cs_, uint32_t pin_dc_, uint32_t pin_sclk_, uint32_t pin_mosi_, uint32_t pin_miso_, uint32_t pin_reset_=0xff);
   ~graphics_device_ssd1283a();
-  void set_spi(uint8_t spi_, uint32_t spi_clock_=SPI_CLOCK_16MHZ);
+  void set_spi(uint8_t spi_, uint32_t spi_clock_=SPI_CLOCK_TRANSFER);
   void init(uint32_t pin_cs_, uint32_t pin_dc_, uint32_t pin_sclk_, uint32_t pin_mosi_, uint32_t pin_miso_, uint32_t pin_reset_=0xff);
   void init_rasterizer(const rasterizer_cfg&, const rasterizer_tiling_cfg&, const rasterizer_vertex_cache_cfg&);
   void init_dma(rasterizer_data_transfer*, uint8_t num_transfers_, fb_format_t *dma_buffer_, size_t dma_buffer_size_);
@@ -461,8 +462,9 @@ void graphics_device_ssd1283a::writedata16_cont(uint16_t data_)
 #if (defined (ESP8266) || defined(ESP32)) && true // faster
   SPI.write16(data_);
 #else
-  SPI.transfer(data_ >> 8);
-  SPI.transfer(data_);
+  //SPI.transfer(data_ >> 8);
+  //SPI.transfer(data_);
+  SPI.transfer16(data_);
 #endif
 }
 //----
