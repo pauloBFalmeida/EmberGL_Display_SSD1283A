@@ -41,7 +41,6 @@ public:
 
   // properties
   enum {supports_dma=true};
-  // enum {supports_dma=false};
   //--------------------------------------------------------------------------
 
   // device properties
