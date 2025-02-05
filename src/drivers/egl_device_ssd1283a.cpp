@@ -510,6 +510,8 @@ void graphics_device_ssd1283a::dma_interrupt_impl()
   dma_channel_acknowledge_irq0(m_dma_chl);  // Clear the interrupt
   end_spi_transition();
 
+  free(m_dma_display_data);
+
   rasterizer_data_transfer &transfer=m_dma_transfers[m_dma_transfers_rpos];
   size_t data_size=transfer.width*transfer.height-1;
 
@@ -523,62 +525,10 @@ void graphics_device_ssd1283a::dma_interrupt_impl()
         m_dma_transfers_rpos=0;
     } while(   m_dma_transfers_rpos!=m_dma_transfers_wpos
             && !start_dma_transfer(m_dma_transfers[m_dma_transfers_rpos]));
-
-#else
-  //   // complete DMA transfer and advance DMA buffer read position
-  //   m_dma_chl.clearInterrupt();
-  //
-  //   rasterizer_data_transfer &transfer=m_dma_transfers[m_dma_transfers_rpos];
-  // #ifdef EGL_PLATFORM_TEENSY4X
-  //   while(m_spi_imxrt->FSR&0x1f);
-  //   while(m_spi_imxrt->SR&LPSPI_SR_MBF);
-  //   m_spi_imxrt->FCR=LPSPI_FCR_TXWATER(15);
-  //   m_spi_imxrt->DER=0;
-  //   m_spi_imxrt->CR=LPSPI_CR_MEN|LPSPI_CR_RRF|LPSPI_CR_RTF;
-  //   m_spi_imxrt->SR=0x3f00;
-  //   size_t data_size=transfer.width*transfer.height;
-  // #elif defined(KINETISK)
-  //   wait_spi_fifo();
-  //   size_t data_size=transfer.width*transfer.height-1;
-  // #endif
-  //   writecmd_last(ILI9341_NOP);
-  //   end_spi_transition();
-  //   m_dma_buffer_rpos+=data_size;
-  //
-  //   // move to the next DMA transfer (loop until end-of-transfers or able to start DMA transfer)
-  //   do
-  //   {
-  //     if(++m_dma_transfers_rpos==m_dma_transfers_size)
-  //       m_dma_transfers_rpos=0;
-  //   } while(   m_dma_transfers_rpos!=m_dma_transfers_wpos
-  //           && !start_dma_transfer(m_dma_transfers[m_dma_transfers_rpos]));
 #endif
 }
-
-// // DMA interrupt handler
-// void dma_interrupt_handler() {
-//   EGL_LOG("dma_interrupt_handler called \r\n");
-//   dma_hw->ints0 = 1u << m_dma_chl; // clear interrupt flag
-//
-//   rasterizer_data_transfer &transfer=m_dma_transfers[m_dma_transfers_rpos];
-//
-//   size_t data_size=transfer.width*transfer.height-1;
-//
-//   graphics_device_ssd1283a::end_spi_transition();
-//   m_dma_buffer_rpos+=data_size;
-//
-//   // move to the next DMA transfer (loop until end-of-transfers or able to start DMA transfer)
-//     do
-//     {
-//       if(++m_dma_transfers_rpos==m_dma_transfers_size)
-//         m_dma_transfers_rpos=0;
-//     } while(   m_dma_transfers_rpos!=m_dma_transfers_wpos
-//             && !start_dma_transfer(m_dma_transfers[m_dma_transfers_rpos]));
-// }
-
 //----
 
-// ??? take a look - dma
 bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer &transfer_)
 {
   EGL_LOG("start_dma_transfer called \r\n");
@@ -625,26 +575,19 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos; // start address of source dma buffer
   // data_size*=sizeof(*m_dma_buffer); // number of bytes to transfer (amount pixels * byte size per pixel)
 
-  // write first pixel data manually
   update_tcr_data16();
 
-  uint8_t src_buffer[data_size * sizeof(uint16_t)];
+  m_dma_display_data = (uint8_t*) malloc(data_size * sizeof(uint16_t));
   for (int i=0; i<data_size; i++) {
-    src_buffer[2*i+1] = (m_dma_buffer[m_dma_buffer_rpos+i].v)    & 0xFF;
-    src_buffer[2*i]   = (m_dma_buffer[m_dma_buffer_rpos+i].v>>8) & 0xFF;
-
-    // writedata16_cont(m_dma_buffer[m_dma_buffer_rpos+i].v);
+    m_dma_display_data[2*i+1] = (m_dma_buffer[m_dma_buffer_rpos+i].v)    & 0xFF;
+    m_dma_display_data[2*i]   = (m_dma_buffer[m_dma_buffer_rpos+i].v>>8) & 0xFF;
   }
-
-  // for (int i=0; i<data_size * sizeof(uint16_t); i++) {
-  //   writedata8_cont(src_buffer[i]);
-  // }
 
   dma_channel_configure(m_dma_chl, &dma_config,
       &spi_get_hw(spi_default)->dr, // Write address
-      src_buffer,                   // Read address (Source)
-      data_size*2,                  // Number of transfers
-      true                          // Dont start immediately
+      m_dma_display_data,           // Read address (Source)
+      data_size*sizeof(uint16_t),   // Number of transfers
+      false                         // Dont start immediately
   );
   dma_channel_start(m_dma_chl);
 
