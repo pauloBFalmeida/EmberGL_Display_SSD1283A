@@ -122,7 +122,7 @@ void graphics_device_ssd1283a::init(uint32_t pin_cs_, uint32_t pin_dc_, uint32_t
   pin_dc = pin_dc_;
 #if defined(ARDUINO_ARCH_RP2040)
   // Initialize SPI
-  spi_init(spi_default, SPI_CLOCK_TRANSFER);
+  spi_init(spi_default, SPI_CLOCK_DISPLAY);
 
   // Set up SPI GPIO functions
   gpio_set_function(pin_sclk_, GPIO_FUNC_SPI);
