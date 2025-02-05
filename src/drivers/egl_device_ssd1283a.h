@@ -131,8 +131,6 @@ private:
 #if EGL_PLATFORM_NUM_DMA>0 && EGL_BUILDOP_DMA_TRANSFER==1 && ARDUINO_ARCH_RP2040
   // DMA
   uint m_dma_chl;
-  dma_channel_config dma_config;
-  uint8_t *m_dma_display_data;
   rasterizer_data_transfer *m_dma_transfers;
   uint8_t m_dma_transfers_size;
   volatile uint8_t m_dma_transfers_rpos;
@@ -141,6 +139,10 @@ private:
   size_t m_dma_buffer_size;
   volatile size_t m_dma_buffer_rpos;
   size_t m_dma_buffer_wpos;
+  // added
+  dma_channel_config dma_config;
+  uint8_t *m_dma_display_data;
+  size_t m_dma_display_data_size;
 #elif EGL_PLATFORM_NUM_DMA>0 && EGL_BUILDOP_DMA_TRANSFER==1
   // DMA
   DMAChannel m_dma_chl;

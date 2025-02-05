@@ -213,14 +213,15 @@ void graphics_device_ssd1283a::init_dma(rasterizer_data_transfer *transfers_, ui
   channel_config_set_read_increment(&dma_config, true);
   channel_config_set_write_increment(&dma_config, false);
 
-  dma_channel_configure(
-      m_dma_chl,                    // Channel to be configured
-      &dma_config,                  // The configuration
-      &spi_get_hw(spi_default)->dr, // Write address
-      dma_buffer_,                  // Read address (Source)
-      dma_buffer_size_,             // Number of transfers
-      false                         // Dont start immediately
-  );
+  // dont need to set this configuration yet
+  // dma_channel_configure(
+  //     m_dma_chl,                    // Channel to be configured
+  //     &dma_config,                  // The configuration
+  //     &spi_get_hw(spi_default)->dr, // Write address
+  //     m_dma_display_data,           // Read address (Source)
+  //     m_dma_display_data_size,      // Number of transfers
+  //     false                         // Dont start immediately
+  // );
 
   // Set up the DMA interrupt handler
   dma_channel_set_irq0_enabled(m_dma_chl, true);
@@ -422,7 +423,8 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   // const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos; // start address of source dma buffer
   update_tcr_data16();
   // create buffer of bytes to dma transfer to display
-  m_dma_display_data = (uint8_t*) malloc(data_size * sizeof(uint16_t));
+  m_dma_display_data_size = data_size * sizeof(uint16_t);
+  m_dma_display_data = (uint8_t*) malloc(m_dma_display_data_size);
   // put the uint16_t color from pixel struct  in the buffer for the dma transfer
   for (int i=0; i<data_size; i++) {
     m_dma_display_data[2*i+1] = (m_dma_buffer[m_dma_buffer_rpos+i].v)    & 0xFF;
@@ -432,7 +434,7 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   dma_channel_configure(m_dma_chl, &dma_config,
       &spi_get_hw(spi_default)->dr, // Write address
       m_dma_display_data,           // Read address (Source)
-      data_size*sizeof(uint16_t),   // Number of transfers
+      m_dma_display_data_size,      // Number of transfers
       false                         // Dont start immediately
   );
   dma_channel_start(m_dma_chl);
