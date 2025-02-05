@@ -290,19 +290,19 @@ void graphics_device_ssd1283a::init_dma(rasterizer_data_transfer *transfers_, ui
   // Get a free channel
   m_dma_chl = dma_claim_unused_channel(true);
 
-  static dma_channel_config dma_config = dma_channel_get_default_config(m_dma_chl);
-  channel_config_set_transfer_data_size(&dma_config, DMA_SIZE_16);
+  dma_config = dma_channel_get_default_config(m_dma_chl);
+  channel_config_set_transfer_data_size(&dma_config, DMA_SIZE_8);
   channel_config_set_dreq(&dma_config, spi_get_dreq(spi_default, true)); // Use SPI TX as data request
   channel_config_set_read_increment(&dma_config, true);
-  channel_config_set_write_increment(&dma_config, true);
+  channel_config_set_write_increment(&dma_config, false);
 
   dma_channel_configure(
       m_dma_chl,                    // Channel to be configured
       &dma_config,                  // The configuration
-      &spi_get_hw(spi_default)->dr, // The initial write address
-      dma_buffer_,                  // The initial read address
-      dma_buffer_size_,             // Number of transfers; in this case each is 1 byte.
-      false                         // Start immediately.
+      &spi_get_hw(spi_default)->dr, // Write address
+      dma_buffer_,                  // Read address (Source)
+      dma_buffer_size_,             // Number of transfers
+      false                         // Dont start immediately
   );
 
   // Set up the DMA interrupt handler
@@ -507,12 +507,12 @@ void graphics_device_ssd1283a::dma_interrupt_impl()
 {
   EGL_LOG("dma_interrupt_impl called \r\n");
 #if defined(ARDUINO_ARCH_RP2040)
-  dma_hw->ints0 = 1u << m_dma_chl; // clear interrupt
+  dma_channel_acknowledge_irq0(m_dma_chl);  // Clear the interrupt
+  end_spi_transition();
 
   rasterizer_data_transfer &transfer=m_dma_transfers[m_dma_transfers_rpos];
   size_t data_size=transfer.width*transfer.height-1;
 
-  end_spi_transition();
   m_dma_buffer_rpos+=data_size;
 
   // move to the next DMA transfer (loop until end-of-transfers or able to start DMA transfer)
@@ -587,6 +587,17 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
   EGL_LOG(sizeof(*m_dma_buffer));
   EGL_LOG(" = size m_dma_buffer == 2\r\n");
   EGL_STATIC_ASSERT(sizeof(*m_dma_buffer)==2);
+
+  EGL_LOG("window x= ");
+  EGL_LOG(transfer_.x);
+  EGL_LOG(" y= ");
+  EGL_LOG(transfer_.y);
+  EGL_LOG(" w-1= ");
+  EGL_LOG(transfer_.width-1);
+  EGL_LOG(" y+h-1= ");
+  EGL_LOG(transfer_.y+transfer_.height-1);
+  EGL_LOG(" \r\n");
+
   // begin spi transiton
   begin_spi_transition();
   set_window_address(transfer_.x, transfer_.y, transfer_.x+transfer_.width-1, transfer_.y+transfer_.height-1);
@@ -611,26 +622,34 @@ bool graphics_device_ssd1283a::start_dma_transfer(const rasterizer_data_transfer
     return false;
   }
 
-  // setup DMA transfer
   const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos; // start address of source dma buffer
-  data_size*=sizeof(*m_dma_buffer); // number of bytes to transfer (amount pixels * byte size per pixel)
+  // data_size*=sizeof(*m_dma_buffer); // number of bytes to transfer (amount pixels * byte size per pixel)
 
   // write first pixel data manually
   update_tcr_data16();
-  writedata16_cont(m_dma_buffer[m_dma_buffer_rpos++].v);
-  data_size-=sizeof(*m_dma_buffer);
 
-  static dma_channel_config dma_config = dma_channel_get_default_config(m_dma_chl);
-  dma_channel_configure(
-      m_dma_chl,                    // Channel to be configured
-      &dma_config,                  // The configuration
-      &spi_get_hw(spi_default)->dr, // The initial write address
-      (const uint16_t*)dma_buf,     // The initial read address
-      data_size,                    // Number of transfers; in this case each is 1 byte.
-      true                          // Start immediately.
+  uint8_t src_buffer[data_size * sizeof(uint16_t)];
+  for (int i=0; i<data_size; i++) {
+    src_buffer[2*i+1] = (m_dma_buffer[m_dma_buffer_rpos+i].v)    & 0xFF;
+    src_buffer[2*i]   = (m_dma_buffer[m_dma_buffer_rpos+i].v>>8) & 0xFF;
+
+    // writedata16_cont(m_dma_buffer[m_dma_buffer_rpos+i].v);
+  }
+
+  // for (int i=0; i<data_size * sizeof(uint16_t); i++) {
+  //   writedata8_cont(src_buffer[i]);
+  // }
+
+  dma_channel_configure(m_dma_chl, &dma_config,
+      &spi_get_hw(spi_default)->dr, // Write address
+      src_buffer,                   // Read address (Source)
+      data_size*2,                  // Number of transfers
+      true                          // Dont start immediately
   );
+  dma_channel_start(m_dma_chl);
 
   return true;
+
   // const fb_format_t *dma_buf=m_dma_buffer+m_dma_buffer_rpos;
   // data_size*=sizeof(*m_dma_buffer);
   //
